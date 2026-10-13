@@ -8,15 +8,26 @@ const CONFIG = {
   subtitle: "Today the brightest smile in the whole world turns a year more awesome 🌟",
   avatar: "photos/black-dress.jpg",
 
+
   // Photos live in the photos/ folder.
+  // face = where Ishani's face is in that photo (in % of the picture): her two eyes and her mouth.
+  // When she opens a photo with a face, the little boy runs in and doodles on her 😂.
+  // profile: true for side-on faces (eyes[0] or eyes[1] is a guess), eye = which eye is really visible.
   photos: [
-    { src: "photos/black-dress.jpg",    caption: "That smile though ✨" },
-    { src: "photos/group.jpg",          caption: "The whole gang 💛" },
-    { src: "photos/lecture-selfie.jpg", caption: "Lecture hall partners in crime 📚" },
-    { src: "photos/yellow-flowers.jpg", caption: "Even the flowers are jealous 🌼" },
-    { src: "photos/squad.jpg",          caption: "Squad day out 🧸" },
-    { src: "photos/tea-time.jpg",       caption: "Tea first, lectures later ☕" },
-    { src: "photos/black-dress-2.jpg",  caption: "Main character energy 🖤" },
+    { src: "photos/black-dress.jpg",    caption: "That smile though ✨",
+      face: { eyes: [[46.9, 31.1], [53.3, 31.4]], mouth: [49.1, 35.3] } },
+    { src: "photos/group.jpg",          caption: "The whole gang 💛",
+      face: { eyes: [[39.4, 63.4], [45.0, 62.3]], mouth: [43.0, 70.8] } },
+    { src: "photos/lecture-selfie.jpg", caption: "Lecture hall partners in crime 📚",
+      face: { eyes: [[90.6, 35.2], [96.5, 33.8]], mouth: [96.6, 43.5], nose: [95.2, 41.2], profile: true, eye: 0 } },
+    { src: "photos/yellow-flowers.jpg", caption: "Even the flowers are jealous 🌼",
+      face: { eyes: [[45.7, 46.2], [51.5, 47.1]], mouth: [49.8, 53.1], nose: [52.9, 49.3] } },
+    { src: "photos/squad.jpg",          caption: "Squad day out 🧸",
+      face: { eyes: [[57.1, 46.3], [62.5, 44.4]], mouth: [60.9, 54.4] } },
+    { src: "photos/tea-time.jpg",       caption: "Tea first, lectures later ☕",
+      face: { eyes: [[40, 45], [46.1, 45.9]], mouth: [41, 55.5], nose: [37.5, 52.5], profile: true, eye: 1 } },
+    { src: "photos/black-dress-2.jpg",  caption: "Main character energy 🖤",
+      face: { eyes: [[46.9-17, 32+6], [53.3-16, 31.4+6]], mouth: [49.1-16, 35.3+10] } },
     { src: "photos/wildflowers.jpg",    caption: "A bouquet for the birthday girl 💐" },
   ],
 
@@ -68,11 +79,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const canvas = $("#confetti");
 const ctx = canvas.getContext("2d");
 let pieces = [];
-function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
+function resize() { if (canvas.width !== innerWidth || canvas.height !== innerHeight) { canvas.width = innerWidth; canvas.height = innerHeight; } }
 addEventListener("resize", resize); resize();
 
 const PHONE = innerWidth < 600;
-const MAX_PIECES = PHONE ? 260 : 600;
+// budget phones (Honor X6b, Galaxy M13…) get a lighter version: fewer effects, paused off-screen animations
+const LITE = PHONE || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+document.documentElement.classList.toggle("lite", LITE);
+const MAX_PIECES = LITE ? 150 : 600;
 function burst(x = innerWidth / 2, y = innerHeight / 2, count = 160, spread = 1) {
   count = Math.max(1, Math.round(count * (PHONE ? 0.45 : 1)));
   count = Math.min(count, MAX_PIECES - pieces.length);
@@ -93,6 +107,7 @@ function burst(x = innerWidth / 2, y = innerHeight / 2, count = 160, spread = 1)
       wobble: Math.random() * 10,
     });
   }
+  wake();
 }
 function rain(count = 200) {
   // drop in small batches instead of hundreds of separate timers
@@ -101,6 +116,7 @@ function rain(count = 200) {
     for (let k = 0; k < 6 && left > 0; k++, left--) {
       if (pieces.length < MAX_PIECES) pieces.push(makePiece(Math.random() * innerWidth, -20, 0.3));
     }
+    wake();
     if (left > 0) setTimeout(tick, 60);
   };
   tick();
@@ -156,9 +172,11 @@ function loop() {
     else drawStar(p.size * 0.7);
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  requestAnimationFrame(loop);
+  if (pieces.length || wasDrawing) requestAnimationFrame(loop);
+  else looping = false; // sleep until the next burst
 }
-loop();
+let looping = false;
+function wake() { if (!looping) { looping = true; requestAnimationFrame(loop); } }
 
 /* ---------- Toast ---------- */
 let toastTimer;
@@ -173,7 +191,7 @@ function toast(msg, ms = 2200) {
 /* ---------- Balloons ---------- */
 function makeBalloons() {
   const wrap = $(".balloons");
-  const n = PHONE ? 5 : 10;
+  const n = LITE ? 9 : 18;
   for (let i = 0; i < n; i++) {
     const b = document.createElement("div");
     b.className = "balloon";
@@ -451,26 +469,36 @@ function renderAutotype(q, i) {
     <button class="btn small" id="q-sub" disabled>Submit ✅</button>
     <p class="q-feedback" id="q-fb"></p>`);
   const input = $("#q-type", s), hint = $("#q-hint", s), sub = $("#q-sub", s), fb = $("#q-fb", s);
+  // every key she presses reveals exactly one more letter of the sentence, whatever she types.
+  // Android keyboards send odd key events, so count input events and never trust the text.
+  const chars = Array.from(TARGET); // keeps the 💖 emoji in one piece
   let n = 0;
-  const sync = (e) => {
-    const deleting = e && e.inputType && e.inputType.startsWith("delete");
-    if (deleting) { toast("No deleting allowed 😤"); }
-    else {
-      const added = Math.max(1, input.value.length - n);
-      n = Math.min(TARGET.length, n + added);
-    }
-    input.value = TARGET.slice(0, n);
-    if (n > 0) hint.textContent = "(autocorrect is on 😇)";
-    if (n >= TARGET.length) {
+  const done = () => n >= chars.length;
+  const show = () => {
+    input.value = chars.slice(0, n).join("");
+    if (n > 0 && !done()) hint.textContent = `(autocorrect is on 😇) ${n}/${chars.length}`;
+    if (done() && sub.disabled && !input.readOnly) {
       input.readOnly = true;
       sub.disabled = false;
       hint.textContent = "Wow. Honest answer 😌";
       buddyReact("Autocorrect knows the truth 😇");
     }
   };
-  input.addEventListener("input", sync);
-  input.addEventListener("compositionend", () => sync());
+  const step = () => { if (!done()) { n++; if (chars[n] === " ") n++; } show(); };
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); if (done()) sub.click(); else toast("Finish the sentence first ✍️"); return; }
+    if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); toast("No deleting allowed 😤"); show(); return; }
+  });
+  input.addEventListener("input", (e) => {
+    const deleting = e.inputType && e.inputType.startsWith("delete");
+    if (deleting) toast("No deleting allowed 😤");
+    else step();
+    // put the caret at the end, and keep the field showing only the revealed part
+    requestAnimationFrame(() => { show(); try { input.setSelectionRange(input.value.length, input.value.length); } catch (err) {} });
+  });
+  input.addEventListener("paste", (e) => { e.preventDefault(); toast("No copy-paste, type it 😏"); });
   sub.addEventListener("click", () => {
+    if (!done()) { toast("Finish the sentence first ✍️"); return; }
     sub.disabled = true;
     fb.textContent = "📢 You said it yourself! It's in writing now.";
     buddyReact("Screenshot! It's official now 📸", true);
@@ -697,11 +725,14 @@ function openLightbox(i) {
   $("#lb-cap").textContent = p.caption;
   $("#lightbox").classList.add("open");
   $("#lightbox").setAttribute("aria-hidden", "false");
+  if (window.boyDoodle) boyDoodle(p); // the little boy comes to draw on her 😂
 }
 function closeLightbox() {
   $("#lightbox").classList.remove("open");
   $("#lightbox").setAttribute("aria-hidden", "true");
+  if (window.boyDoodleStop) boyDoodleStop();
 }
+window.openLightbox = openLightbox;
 $("#lb-close").addEventListener("click", closeLightbox);
 $("#lb-prev").addEventListener("click", (e) => { e.stopPropagation(); openLightbox(lbIndex - 1); });
 $("#lb-next").addEventListener("click", (e) => { e.stopPropagation(); openLightbox(lbIndex + 1); });
@@ -737,6 +768,10 @@ function typeLetter() {
     else { cursor.remove(); $("#signature").classList.add("show"); burst(innerWidth / 2, innerHeight * 0.6, 80, 0.7); buddyReact("Happy birthday, Ishani 💛", true); }
   })();
 }
+
+/* ---------- Pause animations in sections she can't see (saves a lot on phones) ---------- */
+const sleepIO = new IntersectionObserver((entries) => entries.forEach((e) => e.target.classList.toggle("offscreen", !e.isIntersecting)), { rootMargin: "100px 0px" });
+document.querySelectorAll("section").forEach((s) => sleepIO.observe(s));
 
 /* ---------- Scroll reveal ---------- */
 const io = new IntersectionObserver((entries) => {

@@ -12,7 +12,7 @@
   window.cakePhase = () => phase;
 
   // ---------- build the cake out of panels ----------
-  const N = 28;
+  const N = document.documentElement.classList.contains("lite") ? 20 : 28; // fewer panels on budget phones
   function tier({ r, h, y, side, top, text = {} }) {
     const t = document.createElement("div");
     t.className = "t3d";

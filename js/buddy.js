@@ -371,7 +371,9 @@
       setTimeout(() => { if (!gone && currentSection().key === "hero") instruct("hero"); }, 4200);
     }, 1500);
     addEventListener("scroll", onScroll, { passive: true });
-    addEventListener("resize", () => { if (mode === "sit" && !gone) land(); });
+    // phones fire "resize" whenever the address bar slides; only re-perch when the width really changes
+    let lastW = innerWidth;
+    addEventListener("resize", () => { if (innerWidth === lastW) return; lastW = innerWidth; if (mode === "sit" && !gone) land(); });
     addEventListener("pointerdown", () => (lastInteraction = performance.now()), { passive: true });
     gaze();
     saccade();
@@ -533,22 +535,43 @@
   }
 
   // ---------- phone tilt: he feels gravity, holds on, and falls off if it lasts ----------
-  function onOrient(e) {
-    if (e.gamma == null) return;
+  // Real gravity: which way is "down" on the screen, from the accelerometer.
+  // Works however she holds the phone (upright, leaning back…), on Android and iPhone.
+  const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let gravSeen = 0;
+  function onGravity(e) {
+    const g = e.accelerationIncludingGravity;
+    if (!g || g.x == null || g.y == null) return;
+    gravSeen = performance.now();
+    hasTilt = true;
+    const sign = IOS ? -1 : 1; // iPhones report gravity the other way round
+    const x = g.x * sign, y = g.y * sign;
+    const ang = (((screen.orientation && screen.orientation.angle) || window.orientation || 0) * Math.PI) / 180;
+    const sx = x * Math.cos(ang) + y * Math.sin(ang), sy = -x * Math.sin(ang) + y * Math.cos(ang);
+    if (Math.hypot(sx, sy) < 3.5) { tiltRaw = 0; return; } // lying flat on a table: no "down" on the screen
+    tiltRaw = (Math.atan2(-sx, sy) * 180) / Math.PI;
+  }
+  function onOrient(e) { // fallback for phones without a usable accelerometer
+    if (e.gamma == null || performance.now() - gravSeen < 1500) return;
     hasTilt = true;
     const ang = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
     tiltRaw = ang === 90 ? e.beta : (ang === -90 || ang === 270) ? -e.beta : ang === 180 ? -e.gamma : e.gamma;
   }
-  addEventListener("click", function askTilt() {
-    removeEventListener("click", askTilt, true);
-    const DME = window.DeviceMotionEvent;
-    if (DME && typeof DME.requestPermission === "function") DME.requestPermission().then((s) => { if (s === "granted") addEventListener("devicemotion", onMotion); }).catch(() => {});
-    else addEventListener("devicemotion", onMotion);
-    const DOE = window.DeviceOrientationEvent;
-    if (DOE && typeof DOE.requestPermission === "function") {
-      DOE.requestPermission().then((s) => { if (s === "granted") addEventListener("deviceorientation", onOrient); }).catch(() => {});
-    } else addEventListener("deviceorientation", onOrient);
-  }, true);
+  // Sensors only work on https (GitHub Pages is fine). iPhones also need a tap to ask permission.
+  const onDeviceMotion = (e) => { onGravity(e); onMotion(e); };
+  function enableSensors() {
+    addEventListener("devicemotion", onDeviceMotion);
+    addEventListener("deviceorientation", onOrient);
+  }
+  const DME = window.DeviceMotionEvent;
+  if (DME && typeof DME.requestPermission === "function") {
+    addEventListener("click", function askSensors() {
+      removeEventListener("click", askSensors, true);
+      DME.requestPermission().then((s) => { if (s === "granted") enableSensors(); }).catch(() => {});
+      const DOE = window.DeviceOrientationEvent;
+      if (DOE && typeof DOE.requestPermission === "function") DOE.requestPermission().catch(() => {});
+    }, true);
+  } else enableSensors();
 
   function letGo(relieved = false) {
     const held = performance.now() - holdSince;
@@ -646,6 +669,26 @@
     ["Blue is the best colour, right? 💙", "Of course", "Nope", "Same! That's why it's all blue 💙", "Then why is everything blue? 😂"],
     ["If I sit here all day, do I pay rent? 🏠", "Pay up 💸", "Free for you", "I only have one sprinkle 🥲", "Best landlord ever 🥹"],
     ["Can I come to the party too? 🥳", "Of course", "Hmm…", "Yay! I'll bring my hat 🎉", "I'm coming anyway 😎"],
+    [`Does ${DOG1} steal food from the table? 🍗`, "All the time 😂", "Never", `${DOG1}, you little thief 😂`, `Sure… and I'm a giraffe 🦒`],
+    [`Who wakes you up first: ${DOG1} or ${DOG2}? ⏰`, DOG1, DOG2, `${DOG1} the alarm clock 🐶⏰`, `${DOG2} has zero chill 😂`],
+    [`Should ${DOG1} and ${DOG2} get birthday hats too? 🎉`, "Yes!", "They'd eat them", "Party dogs! 🐶🥳", "Fair, hats are delicious 😂"],
+    [`If ${DOG2} could text you, what would they send? 📱`, "🦴🦴🦴", "I love you", "Bones. Only bones 😂", "Okay that's too cute 🥹"],
+    ["Pizza or kottu for the birthday dinner? 🍕", "Pizza", "Kottu", "Extra cheese for the queen 🧀", "Kottu gang 🔥 good choice"],
+    ["Do you sing in the shower? 🚿🎤", "Yes 😂", "Never", "Concert every morning 🎶", "I don't believe you 😏"],
+    ["On a scale of 1 to 10, how awesome are you today? 🌟", "10", "11", "Correct ✅", "Even more correct 😎"],
+    ["Is it okay if I eat all the sprinkles? 🍩", "Okay", "Hands off!", "Sprinkle party 🌈", "Fine… just one 🥺"],
+    ["Should we play hide and seek? 🙈", "Yes!", "You'll lose", "Okay! …I'm behind the photo 👀", "Rude 😤 but probably true"],
+    ["Do you snore? 😴", "No!", "A little 🙈", `Hmm, ${DOG1} says otherwise 😂`, "Cutest snore ever, I bet 😆"],
+    ["Mountains or beach for a birthday trip? 🏔️🏖️", "Mountains", "Beach", "Cold air and hot tea ☕", "Sun, sea and ice cream 🍦"],
+    ["Coffee or tea? ☕", "Tea", "Coffee", "I saw that tea photo, I knew it 🍵", "Coffee queen ☕👑"],
+    ["Should I learn to dance properly? 💃", "Yes please", "You're perfect", "Lessons start tomorrow 🕺", "Aww 🥹 I'll keep my wiggle"],
+    ["Want to hear a joke? 🤡", "Yes", "No", "Why did the cake go to the doctor? It felt crummy 😂", "Okay… but it was a good one 😔"],
+    ["Is chocolate a food group? 🍫", "Obviously", "No", "Science agrees 🧪😌", "Then why is it in my lunchbox? 😂"],
+    ["How many candles should I add next year? 🕯️", "22", "None!", "22 it is 🎂", "Forever 21 then 😎"],
+    ["Do you like surprises? 🎁", "Love them", "Not really", "Good, because this whole page is one 😁", "Oops… too late 🙈"],
+    ["Would you share your cake with me? 🍰", "Of course", "Nope", "Best friend ever 🥹", "I'll just sniff it then 👃"],
+    ["Should I stop asking questions? 🤐", "Never", "Please 😂", "Yay! More questions coming 😁", "Okay okay… for now 🤐"],
+    ["Who's the birthday queen today? 👑", "Me 😌", DOG1, "Correct! All hail the queen 👑", `${DOG1} says thank you but no 😂`],
   ];
   function setAsk(yes, no) {
     q('.bb-ask [data-a="yes"]', el).textContent = yes;

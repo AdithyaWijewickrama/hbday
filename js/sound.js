@@ -8,102 +8,113 @@ const Sound = (() => {
   let muted = false;
   try { muted = localStorage.getItem("bday-muted") === "1"; } catch (e) {}
 
+  // budget phones (Honor X6b, Galaxy M13…): fewer voices, no echo
+  const LITE = innerWidth < 600 || (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+  const MAX_VOICES = LITE ? 6 : 14;
+  let live = 0, noise = null, idleTimer;
+
   function ac() {
     if (!ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
-      ctx = new AC();
-      // master: gentle lowpass so nothing sounds harsh, plus a small reverb send
-      out = ctx.createGain(); out.gain.value = 0.9;
-      const soft = ctx.createBiquadFilter(); soft.type = "lowpass"; soft.frequency.value = 7000;
-      out.connect(soft).connect(ctx.destination);
-      verb = ctx.createConvolver();
-      verb.buffer = roomImpulse(1.8);
-      const wet = ctx.createGain(); wet.gain.value = 0.28;
-      verb.connect(wet).connect(soft);
+      // "playback" asks for bigger audio buffers: a bit more delay, but no crackling on slow phones
+      try { ctx = new AC({ latencyHint: "playback" }); } catch (e) { ctx = new AC(); }
+      // master: gentle lowpass, then a limiter so loud moments never clip (clipping = crackle)
+      out = ctx.createGain(); out.gain.value = 0.8;
+      const soft = ctx.createBiquadFilter(); soft.type = "lowpass"; soft.frequency.value = 6500;
+      const limit = ctx.createDynamicsCompressor();
+      limit.threshold.value = -12; limit.knee.value = 8; limit.ratio.value = 8; limit.attack.value = 0.003; limit.release.value = 0.2;
+      out.connect(soft).connect(limit).connect(ctx.destination);
+      if (!LITE) { // a cheap little echo instead of a heavy reverb
+        verb = ctx.createGain();
+        const d = ctx.createDelay(1), fb = ctx.createGain(), tone = ctx.createBiquadFilter(), wet = ctx.createGain();
+        d.delayTime.value = 0.13; fb.gain.value = 0.32; tone.type = "lowpass"; tone.frequency.value = 2200; wet.gain.value = 0.22;
+        verb.connect(d); d.connect(tone).connect(fb).connect(d); tone.connect(wet).connect(soft);
+      }
+      // one shared noise buffer, made once (making it per sound stalled slow phones)
+      noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      const nd = noise.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < nd.length; i++) { last = last * 0.4 + (Math.random() * 2 - 1) * 0.6; nd[i] = last; }
     }
     if (ctx.state === "suspended") ctx.resume();
     return ctx;
   }
-  function roomImpulse(sec) {
-    const len = Math.floor(ctx.sampleRate * sec), buf = ctx.createBuffer(2, len, ctx.sampleRate);
-    for (let ch = 0; ch < 2; ch++) {
-      const d = buf.getChannelData(ch);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
-    }
-    return buf;
+  // claim a voice; false when too many sounds are already playing
+  function claim(sec) {
+    if (muted || live >= MAX_VOICES) return null;
+    const a = ac(); if (!a) return null;
+    live++;
+    setTimeout(() => { live = Math.max(0, live - 1); }, (sec + 0.2) * 1000);
+    clearTimeout(idleTimer); // rest the audio engine when nothing has played for a while
+    idleTimer = setTimeout(() => { if (ctx && live === 0 && ctx.state === "running") ctx.suspend(); }, 8000);
+    return a;
   }
-  // route a node to the dry output and the reverb
+  const now = (a) => a.currentTime + 0.03;
+  // route a node to the dry output and the echo
   function send(node, reverb = 0.6) {
     node.connect(out);
-    if (reverb) { const g = ctx.createGain(); g.gain.value = reverb; node.connect(g).connect(verb); }
+    if (reverb && verb) { const g = ctx.createGain(); g.gain.value = reverb; node.connect(g).connect(verb); }
+  }
+  // attack, then a natural decay that really reaches silence before the sound stops (no click at the end)
+  function env(g, t, vol, attack, dur) {
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.gain.setValueAtTime(0, t + dur + 0.01);
   }
 
-  // a soft plucked note (kalimba / music box): sine + a quiet overtone, smooth attack, long natural decay
+  // a soft plucked note (kalimba / music box): sine + quiet overtones
   function note(f, { dur = 1.1, vol = 0.07, delay = 0, bright = 0.25, reverb = 0.7 } = {}) {
-    if (muted) return;
-    const a = ac(); if (!a) return;
-    const t = a.currentTime + delay;
+    const a = claim(dur + delay); if (!a) return;
+    const t = now(a) + delay;
     const g = a.createGain();
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.006);
-    g.gain.setTargetAtTime(0, t + 0.01, dur / 4);
-    [[1, 1], [2.01, bright], [3.98, bright * 0.35]].forEach(([mult, amp]) => {
+    env(g, t, vol, 0.008, dur);
+    (LITE ? [[1, 1], [2.01, bright]] : [[1, 1], [2.01, bright], [3.98, bright * 0.35]]).forEach(([mult, amp]) => {
       const o = a.createOscillator(), og = a.createGain();
       o.type = "sine";
       o.frequency.value = f * mult;
       og.gain.value = amp;
       o.connect(og).connect(g);
-      o.start(t); o.stop(t + dur + 0.3);
+      o.start(t); o.stop(t + dur + 0.05);
     });
     send(g, reverb);
   }
 
   // filtered noise with a smooth envelope: breath, wind, crumbs, claps
   function air(dur, { vol = 0.1, type = "bandpass", freq = 1200, to = null, q = 0.7, attack = 0.01, delay = 0, reverb = 0.3 } = {}) {
-    if (muted) return;
-    const a = ac(); if (!a) return;
-    const t = a.currentTime + delay;
-    const buf = a.createBuffer(1, Math.max(1, Math.floor(a.sampleRate * (dur + 0.1))), a.sampleRate);
-    const d = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < d.length; i++) { last = last * 0.4 + (Math.random() * 2 - 1) * 0.6; d[i] = last; } // slightly warm noise
-    const src = a.createBufferSource(); src.buffer = buf;
+    const a = claim(dur + delay); if (!a) return;
+    const t = now(a) + delay;
+    const src = a.createBufferSource(); src.buffer = noise;
     const f = a.createBiquadFilter(); f.type = type; f.Q.value = q;
     f.frequency.setValueAtTime(freq, t);
     if (to) f.frequency.exponentialRampToValueAtTime(to, t + dur);
     const g = a.createGain();
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + attack);
-    g.gain.setTargetAtTime(0, t + attack, Math.max(0.01, (dur - attack) / 3));
+    env(g, t, vol, Math.max(0.003, attack), dur);
     src.connect(f).connect(g);
     send(g, reverb);
-    src.start(t); src.stop(t + dur + 0.1);
+    src.start(t, Math.random() * Math.max(0, 1.9 - dur)); src.stop(t + dur + 0.05);
   }
 
   // a round, soft bubble "plop"
   function bubble(f = 500, { vol = 0.08, delay = 0 } = {}) {
-    if (muted) return;
-    const a = ac(); if (!a) return;
-    const t = a.currentTime + delay;
+    const a = claim(0.25 + delay); if (!a) return;
+    const t = now(a) + delay;
     const o = a.createOscillator(), g = a.createGain();
     o.type = "sine";
     o.frequency.setValueAtTime(f, t);
     o.frequency.exponentialRampToValueAtTime(f * 2.4, t + 0.07);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.008);
-    g.gain.setTargetAtTime(0, t + 0.03, 0.03);
+    env(g, t, vol, 0.008, 0.16);
     o.connect(g);
     send(g, 0.5);
-    o.start(t); o.stop(t + 0.25);
+    o.start(t); o.stop(t + 0.2);
   }
 
   // a tiny cute "voice" (anime style): buzzy source shaped by vowel formants,
   // with a lowpass that closes for the nasal n / m sounds
   function voice(f0, dur, { delay = 0, vol = 0.05, to = null, nasal = [0.25, 0.25], open = 3200, vib = 0.025 } = {}) {
-    if (muted) return;
-    const a = ac(); if (!a) return;
-    const t = a.currentTime + delay;
+    const a = claim(dur + delay); if (!a) return;
+    const t = now(a) + delay;
     const o = a.createOscillator(); o.type = "sawtooth";
     o.frequency.setValueAtTime(f0, t);
     if (to) o.frequency.linearRampToValueAtTime(to, t + dur);
@@ -122,7 +133,8 @@ const Sound = (() => {
     g.gain.setValueAtTime(vol, t + dur - 0.04);
     g.gain.linearRampToValueAtTime(0, t + dur);
     o.connect(mouth);
-    [[650, 1, 5], [1150, 0.55, 6], [3000, 0.18, 7]].forEach(([f, amp, q]) => { // "o" vowel, child-sized
+    const bands = LITE ? [[650, 1, 5], [1150, 0.55, 6]] : [[650, 1, 5], [1150, 0.55, 6], [3000, 0.18, 7]];
+    bands.forEach(([f, amp, q]) => { // "o" vowel, child-sized
       const bp = a.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = q;
       const bg = a.createGain(); bg.gain.value = amp * 3;
       mouth.connect(bp).connect(bg).connect(g);
@@ -138,6 +150,9 @@ const Sound = (() => {
   const fx = {
     // his "voice": a couple of soft kalimba notes, rising for questions
     babble(text = "") {
+      const t0 = performance.now();
+      if (t0 - (fx.lastBabble || 0) < 450) return; // he doesn't need a jingle for every word
+      fx.lastBabble = t0;
       const n = Math.min(4, Math.max(2, Math.round(text.length / 14)));
       const asking = /\?/.test(text);
       let i = 1 + ((Math.random() * 3) | 0);
@@ -153,13 +168,15 @@ const Sound = (() => {
     giggle() { [5, 4, 5, 4, 3].forEach((s, k) => note(nth(s), { dur: 0.4, vol: 0.035, delay: k * 0.07, bright: 0.1 })); },
     clap(times = 3) {
       for (let k = 0; k < times; k++) // each clap = a few tiny bursts close together, like real hands
-        [0, 0.008, 0.019].forEach((o, j) => air(0.09, { vol: 0.12 - j * 0.03, freq: 1100 + j * 250, q: 1.1, attack: 0.002, delay: k * 0.24 + o, reverb: 0.5 }));
+        (LITE ? [0] : [0, 0.008, 0.019]).forEach((o, j) => air(0.09, { vol: 0.12 - j * 0.03, freq: 1100 + j * 250, q: 1.1, attack: 0.002, delay: k * 0.24 + o, reverb: 0.5 }));
     },
     whoosh() { air(0.9, { vol: 0.06, freq: 350, to: 1500, q: 0.9, attack: 0.3, reverb: 0.2 }); },
     zip() { air(0.6, { vol: 0.05, freq: 600, to: 2200, q: 1.2, attack: 0.15, reverb: 0.2 }); },
+    // pencil scribbling on paper: a few quick scratchy strokes
+    scribble() { for (let k = 0; k < (LITE ? 2 : 3); k++) air(0.11, { vol: 0.035, freq: 3400 + Math.random() * 1600, to: 2200, q: 1.4, attack: 0.01, delay: k * 0.16 + Math.random() * 0.04, reverb: 0 }); },
     swish() { air(0.35, { vol: 0.07, freq: 2600, to: 900, q: 0.8, attack: 0.05, reverb: 0.2 }); },
     step() { air(0.08, { vol: 0.05, type: "lowpass", freq: 260, attack: 0.004, reverb: 0 }); },
-    munch() { for (let k = 0; k < 4; k++) air(0.07, { vol: 0.09, type: "lowpass", freq: 1500 + Math.random() * 800, attack: 0.004, delay: k * 0.17 + Math.random() * 0.04, reverb: 0.1 }); },
+    munch() { for (let k = 0; k < (LITE ? 2 : 4); k++) air(0.07, { vol: 0.09, type: "lowpass", freq: 1500 + Math.random() * 800, attack: 0.004, delay: k * 0.17 + Math.random() * 0.04, reverb: 0.1 }); },
     slice() { air(0.45, { vol: 0.09, freq: 3200, to: 1100, q: 0.9, attack: 0.03, reverb: 0.25 }); },
     puff() { air(0.55, { vol: 0.14, type: "lowpass", freq: 900, to: 400, attack: 0.05, reverb: 0.2 }); },
     yawn() { air(0.9, { vol: 0.05, type: "lowpass", freq: 700, to: 300, attack: 0.2, reverb: 0.3 }); note(392, { dur: 1.2, vol: 0.03, delay: 0.1 }); },
