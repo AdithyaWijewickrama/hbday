@@ -12,10 +12,11 @@ const CONFIG = {
   photos: [
     { src: "photos/black-dress.jpg",    caption: "That smile though ✨" },
     { src: "photos/group.jpg",          caption: "The whole gang 💛" },
-    { src: "photos/lecture-selfie.jpg", caption: "No credit homework 📚" },
+    { src: "photos/lecture-selfie.jpg", caption: "Lecture hall partners in crime 📚" },
     { src: "photos/yellow-flowers.jpg", caption: "Even the flowers are jealous 🌼" },
     { src: "photos/squad.jpg",          caption: "Squad day out 🧸" },
     { src: "photos/tea-time.jpg",       caption: "Tea first, lectures later ☕" },
+    { src: "photos/black-dress-2.jpg",  caption: "Main character energy 🖤" },
     { src: "photos/wildflowers.jpg",    caption: "A bouquet for the birthday girl 💐" },
   ],
 
@@ -43,21 +44,22 @@ And remember, you admitted it yourself today: you are the most beautiful girl in
 
 Have the best birthday ever!`,
 
-  candles: 5,
+  dogs: ["Tobby", "Bobby"],               // her dogs, the little guy asks about them
+  age: 21,                               // shown on the cake and its candles
 
   // Friends she feeds cake to (faces from the group photo).
   // eyes/mouth are positions on each face photo in %, skin is used to "close" the eyes while chewing.
   friends: [
     { src: "photos/friend-1.jpg", says: "Yummy! Happy birthday! 🎂", skin: "#d2782f", eyes: [[35, 45], [62, 46]], mouth: [50, 71] },
-    { src: "photos/friend-2.jpg", says: "Best cake ever 😋",         skin: "#f08a33", eyes: [[40, 48], [67, 53]], mouth: [50, 73] },
-    { src: "photos/friend-3.jpg", says: "Thank you birthday girl! 💖", skin: "#c27c59", eyes: [[35, 56], [64, 58]], mouth: [49, 81] },
-    { src: "photos/friend-4.jpg", says: "Happy birthday Ishani! 💛", skin: "#875744", eyes: [[32, 33], [65, 31]], mouth: [48, 62] },
+    { src: "photos/friend-2.jpg", says: "Best cake ever 😋",         skin: "#cea086", eyes: [[36, 47], [61, 47]], mouth: [50, 66] },
+    { src: "photos/friend-3.jpg", says: "Thank you birthday girl! 💖", skin: "#d5aa8d", eyes: [[40, 47], [65.5, 44.5]], mouth: [55.5, 68] },
+    { src: "photos/friend-4.jpg", says: "Happy birthday Ishani! 💛", skin: "#b68e7e", eyes: [[29, 36], [61, 32]], mouth: [44, 64.5] },
   ],
 };
 /* ========================================================= */
 
 const $ = (s, el = document) => el.querySelector(s);
-const palette = ["#ff6fb5", "#ffb38a", "#ffe066", "#7ee8c7", "#7cc6ff", "#b79cff"];
+const palette = ["#3b82f6", "#38bdf8", "#93c5fd", "#ffe066", "#60a5fa", "#a5b4fc"];
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -183,6 +185,7 @@ function makeBalloons() {
     b.style.height = `${76 * s}px`;
     b.style.animationDuration = `${12 + Math.random() * 10}s`;
     b.style.animationDelay = `${-Math.random() * 20}s`;
+    b.addEventListener("pointerdown", (e) => { e.preventDefault(); popBalloon(b); });
     wrap.appendChild(b);
   }
 }
@@ -311,7 +314,7 @@ function renderChoice(q, i) {
   const s = stage(`
     ${stepLabel(i)}
     <p class="q-text">${esc(q.text)}</p>
-    ${q.formula ? `<p class="q-text" style="font-family:'Caveat',cursive;font-size:1.9rem;color:#e2468f">${esc(q.formula)}</p>` : ""}
+    ${q.formula ? `<p class="q-text" style="font-family:'Caveat',cursive;font-size:1.9rem;color:#2563eb">${esc(q.formula)}</p>` : ""}
     <div class="q-options">${q.options.map((o, k) => `<button class="q-btn" data-k="${k}">${esc(o.label)}</button>`).join("")}</div>
     <p class="q-feedback" id="q-fb"></p>`);
   const fb = $("#q-fb", s);
@@ -480,7 +483,7 @@ function renderAloud(q, i) {
   const s = stage(`
     ${stepLabel(i)}
     <p class="q-text">One last thing. Read this out loud, just once 🎤</p>
-    <p class="q-text" style="font-family:'Caveat',cursive;font-size:2rem;color:#e2468f">“I am the most beautiful girl in the world.”</p>
+    <p class="q-text" style="font-family:'Caveat',cursive;font-size:2rem;color:#2563eb">“I am the most beautiful girl in the world.”</p>
     <button class="btn" id="q-said">Okay, I said it 🙈</button>
     <p class="q-feedback" id="q-fb"></p>`);
   $("#q-said", s).addEventListener("click", (e) => {
@@ -563,30 +566,6 @@ function fill() {
     r.appendChild(card);
   });
 
-  // Candles
-  const cWrap = $("#candles");
-  let lit = CONFIG.candles;
-  for (let i = 0; i < CONFIG.candles; i++) {
-    const c = document.createElement("div");
-    c.className = "candle";
-    c.innerHTML = `<span class="flame"></span>`;
-    c.addEventListener("click", () => {
-      if (c.classList.contains("out")) return;
-      c.classList.add("out");
-      Sound.fx.puff();
-      if (lit === CONFIG.candles) buddyReact("Did you make a wish first? 🤫");
-      if (--lit === 0) {
-        buddyReact("Yaaay! 🎂 Now cut it yourself!", true);
-        const rect = $("#cake").getBoundingClientRect();
-        burst(rect.left + rect.width / 2, rect.top + 40, 220, 1.1);
-        setTimeout(rain, 300);
-        $("#wish-msg").classList.add("show");
-        setTimeout(() => { $("#knife").classList.add("ready"); $("#cut-hint").classList.add("show"); }, 900);
-      }
-    });
-    cWrap.appendChild(c);
-  }
-
   $("#signature").textContent = `— ${CONFIG.from}`;
   buildFriends();
   renderStart();
@@ -599,75 +578,59 @@ function serveSlice() {
   s.classList.remove("show"); void s.offsetWidth; s.classList.add("show");
   sliceReady = true;
 }
-// She cuts it herself: drag the knife down through the cake
-(function knifeDrag() {
-  const knife = $("#knife"), line = $("#cut-line");
-  const MAX = 250, CUT_AT = 200;
-  let startY = null, dy = 0, moved = false, cut = false;
-  const setKnife = (v) => {
-    knife.style.transform = `translateY(${v}px) rotate(45deg)`;
-    line.style.height = `${Math.max(0, Math.min(172, v - 70))}px`;
-  };
-  const finishCut = () => {
-    cut = true;
-    Sound.fx.slice();
-    knife.classList.remove("dragging", "ready");
-    knife.classList.add("done");
-    line.classList.remove("live");
-    line.classList.add("show");
-    line.style.height = "";
-    $("#cut-hint").classList.remove("show");
-    burstAt($("#cake"), 80, 0.7);
-    buddyReact("Perfect cut! 👏 Now feed everyone 🍰", true);
-    setTimeout(() => {
-      serveSlice();
-      $("#feed").classList.add("show");
-      $("#feed").scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 700);
-  };
-  knife.addEventListener("pointerdown", (e) => {
-    if (cut || !knife.classList.contains("ready")) return;
-    e.preventDefault();
-    knife.setPointerCapture(e.pointerId);
-    startY = e.clientY; dy = 0; moved = false;
-    knife.classList.remove("returning");
-    knife.classList.add("dragging");
-    line.classList.add("live");
-  });
-  knife.addEventListener("pointermove", (e) => {
-    if (startY == null || cut) return;
-    const scale = $("#cake").getBoundingClientRect().height / $("#cake").offsetHeight || 1;
-    dy = Math.max(0, Math.min(MAX, (e.clientY - startY) / scale));
-    if (dy > 6) moved = true;
-    setKnife(dy);
-    if (dy >= CUT_AT) { startY = null; finishCut(); }
-  });
-  const release = () => {
-    if (startY == null || cut) return;
-    startY = null;
-    knife.classList.remove("dragging");
-    knife.classList.add("returning");
-    setKnife(0);
-    if (!moved) toast("Hold the knife and drag it down 👇");
-    else buddyReact("Almost! Go all the way down 💪");
-  };
-  knife.addEventListener("pointerup", release);
-  knife.addEventListener("pointercancel", release);
-  knife.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !cut && knife.classList.contains("ready")) finishCut(); });
-})();
+const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+// little floating manga-style words over a friend's face
+function animeText(friend, words, start = 0) {
+  words.forEach((w, k) => setTimeout(() => {
+    const s = document.createElement("span");
+    s.className = "anime-word";
+    s.textContent = w;
+    s.style.left = `${20 + Math.random() * 60}%`;
+    s.style.setProperty("--tilt", `${(Math.random() * 30 - 15).toFixed(0)}deg`);
+    friend.appendChild(s);
+    setTimeout(() => s.remove(), 1400);
+  }, start + k * 240));
+}
+
+/* ---------- popping balloons ---------- */
+let popped = 0;
+function popBalloon(b, byBuddy = false) {
+  if (b.classList.contains("pop")) return;
+  const r = b.getBoundingClientRect();
+  b.classList.add("pop");
+  Sound.fx.balloon();
+  burst(r.left + r.width / 2, r.top + r.height / 2, 34, 0.55);
+  setTimeout(() => { // a new one floats up from the bottom
+    b.classList.remove("pop");
+    b.style.left = `${Math.random() * 92}%`;
+    b.style.animation = "none"; void b.offsetWidth; b.style.animation = "";
+    b.style.animationDelay = "0s";
+  }, 700);
+  if (!byBuddy) { popped++; if (window.buddyBalloon) buddyBalloon(popped); }
+}
+window.popBalloon = popBalloon;
+
 function buildFriends() {
   const wrap = $("#friends");
   let fedCount = 0;
   CONFIG.friends.forEach((f) => {
     const b = document.createElement("button");
     b.className = "friend";
-    const pos = (p) => `left:${p[0]}%;top:${p[1]}%`;
-    const crumbs = [-14, 10, -4].map((dx, k) => `<span class="crumb" style="left:${f.mouth[0] + (k - 1) * 6}%;top:${f.mouth[1] + 8}%;--dx:${dx}px;animation-delay:${k * 0.3}s"></span>`).join("");
-    b.innerHTML = `<span class="face" style="--skin:${esc(f.skin || "#a86b4c")}">
+    const [e1, e2] = f.eyes || [[36, 46], [64, 46]];
+    const m = f.mouth || [50, 70];
+    const ed = Math.hypot(e2[0] - e1[0], e2[1] - e1[1]);               // eye distance in % of the face
+    const rot = Math.atan2(e2[1] - e1[1], e2[0] - e1[0]) * 180 / Math.PI; // head tilt
+    const at = (p, w, h) => `left:${p[0]}%;top:${p[1]}%;width:${(w * ed).toFixed(1)}%;height:${(h * ed).toFixed(1)}%`;
+    const out = (e, dir) => [e[0] + dir * ed * 0.12, e[1] + ed * 0.42];  // cheek under each eye
+    const eye = (e) => `<span class="eye-cover" style="${at(e, 0.78, 0.52)}"><svg viewBox="0 0 40 26" aria-hidden="true">
+        <path class="e-squint" d="M8 6 L30 13 L8 20" /><path class="e-happy" d="M5 19 Q20 1 35 19" /></svg></span>`;
+    const crumbs = [-14, 10, -4].map((dx, k) => `<span class="crumb" style="left:${m[0] + (k - 1) * 6}%;top:${m[1] + 8}%;--dx:${dx}px;animation-delay:${k * 0.3}s"></span>`).join("");
+    b.innerHTML = `<span class="face" style="--skin:${esc(f.skin || "#a86b4c")};--rot:${rot.toFixed(1)}deg">
         <img src="${esc(f.src)}" alt="${esc(f.name || "Friend")}" />
-        ${(f.eyes || []).map((e) => `<span class="eye-cover" style="${pos(e)}"></span>`).join("")}
-        <span class="big-mouth" style="${pos(f.mouth || [50, 70])}"></span>${crumbs}
-      </span>
+        ${eye(e1)}${eye(e2).replace("M8 6 L30 13 L8 20", "M32 6 L10 13 L32 20")}
+        <span class="blush" style="${at(out(e1, -1), 0.5, 0.26)}"></span><span class="blush" style="${at(out(e2, 1), 0.5, 0.26)}"></span>
+        <span class="big-mouth" style="${at(m, 1.2, 0.85)}"></span>${crumbs}
+      </span><span class="hearts"><i>💕</i><i>💖</i><i>💗</i></span>
       ${f.name ? `<strong>${esc(f.name)}</strong>` : ""}<span class="bubble"></span><span class="tap">tap to feed 🍰</span>`;
     b.addEventListener("click", () => {
       if (!sliceReady || b.classList.contains("fed")) {
@@ -695,8 +658,13 @@ function buildFriends() {
         fly.remove();
         b.classList.remove("open");
         b.classList.add("chewing");
-        [0, 650, 1300, 1950].forEach((t) => setTimeout(() => Sound.fx.munch(), t));
-        buddyReact(["Nom nom nom 😋", "Look at them chew 😂", "Delicious! 🍰", "Me next? 🥺"][fedCount % 4]);
+        // anime eating: "nom nom nom", crunch, then a happy "mmm~"
+        Sound.fx.nom();
+        setTimeout(() => Sound.fx.munch(), 800);
+        setTimeout(() => Sound.fx.mmm(), 1500);
+        animeText(b, ["nom", "nom", "nom~"], 0);
+        setTimeout(() => animeText(b, [pick(["mmm~ ♡", "oishii~ ✨", "yummy~ ♡", "おいしい~ ✨"])], 0), 1500);
+        setTimeout(() => buddyReact(["Nom nom nom 😋", "Look at them chew 😂", "Delicious! 🍰", "Me next? 🥺"][(fedCount - 1) % 4]), 2700);
         setTimeout(() => {
           b.classList.remove("chewing");
           b.classList.add("fed");

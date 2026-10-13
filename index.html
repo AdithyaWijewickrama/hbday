@@ -7,7 +7,7 @@
   <meta name="description" content="A little birthday surprise for Ishani 💖" />
   <meta property="og:title" content="Happy Birthday, Ishani! 🎂" />
   <meta property="og:description" content="Someone left a little surprise for you… tap to open 🎁" />
-  <meta name="theme-color" content="#ff6fb5" />
+  <meta name="theme-color" content="#3b82f6" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎂</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -65,18 +65,19 @@
     <!-- ===== Cake ===== -->
     <section class="cake-section reveal">
       <h2>Make a wish 🕯️</h2>
-      <p class="section-sub">Close your eyes, make a wish, then tap the candles to blow them out.</p>
-      <div class="cake" id="cake">
-        <div class="knife" id="knife" role="button" tabindex="-1" aria-label="Knife: drag it down through the cake">🔪</div>
-        <div class="cut-line" id="cut-line"></div>
+      <p class="section-sub" id="cake-sub">Spin the cake with your finger 👆 then make a wish.</p>
+      <div class="cake-stage" id="cake">
+        <div class="cake3d"><div class="spin" id="cake-spin"></div></div>
+        <canvas class="cut-canvas" id="cut-canvas"></canvas>
+        <div class="knife-cursor" id="knife" aria-hidden="true">🔪</div>
         <div class="slice" id="slice" aria-hidden="true">🍰</div>
-        <div class="candles" id="candles"></div>
-        <div class="tier tier-top"><span class="drip"></span></div>
-        <div class="tier tier-bottom"><span class="drip"></span><span class="sprinkles"></span></div>
-        <div class="plate"></div>
+      </div>
+      <div class="cake-actions">
+        <button class="btn" id="wish-btn" type="button">🙏 Make a wish</button>
+        <button class="btn ghost" id="mic-btn" type="button" hidden>🎤 Blow into the mic</button>
       </div>
       <p class="wish-msg" id="wish-msg">Your wish is on its way ✨💫</p>
-      <p class="cut-hint" id="cut-hint">Your turn! Grab the knife and drag it down through the cake 🔪👇</p>
+      <p class="cut-hint" id="cut-hint"></p>
       <div class="feed" id="feed">
         <p class="feed-title">Now feed your friends! Tap a friend to give them a slice 🍰</p>
         <div class="friends" id="friends"></div>
@@ -125,8 +126,10 @@
   <!-- Toast -->
   <div class="toast" id="toast" role="status"></div>
 
+  <div class="wish-overlay" id="wish-overlay" aria-live="polite"><div><p>Close your eyes…</p><p class="wish-count" id="wish-count">3</p><p>and make a wish 🤫</p></div></div>
   <script src="js/sound.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/cake.js"></script>
   <script src="js/buddy.js"></script>
 </body>
 </html>
