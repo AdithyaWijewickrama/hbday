@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Happy Birthday, Ishani! 🎂</title>
+  <meta name="description" content="A little birthday surprise for Ishani 💖" />
+  <meta property="og:title" content="Happy Birthday, Ishani! 🎂" />
+  <meta property="og:description" content="Someone left a little surprise for you… tap to open 🎁" />
+  <meta name="theme-color" content="#ff6fb5" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎂</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Quicksand:wght@400;500;700&family=Caveat:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/buddy.css" />
+</head>
+<body>
+  <canvas id="confetti"></canvas>
+  <div class="balloons" aria-hidden="true"></div>
+
+  <!-- ===== Intro gift ===== -->
+  <div id="intro" class="intro">
+    <p class="intro-hint" id="intro-hint">Someone left a little something for you…</p>
+    <button id="gift" class="gift" aria-label="Open your gift">
+      <span class="gift-lid"></span>
+      <span class="gift-box"></span>
+      <span class="gift-bow">🎀</span>
+    </button>
+    <p class="intro-tap">tap the gift ✨</p>
+  </div>
+
+  <main id="site" class="hidden">
+    <!-- ===== Hero ===== -->
+    <section class="hero">
+      <div class="avatar-wrap">
+        <div class="avatar-ring"></div>
+        <img class="avatar" id="avatar" src="photos/black-dress.jpg" alt="Birthday girl" />
+        <span class="avatar-crown">👑</span>
+      </div>
+      <p class="eyebrow">It's your day!</p>
+      <h1 class="title">
+        <span class="wavy" id="hb-text">Happy Birthday</span>
+        <span class="name" id="name-text">Ishani</span>
+      </h1>
+      <p class="subtitle" id="subtitle"></p>
+      <div class="hero-actions">
+        <button class="btn" id="celebrate">🎉 Celebrate!</button>
+        <a class="btn ghost" href="#quiz">🧠 Take your birthday quiz</a>
+      </div>
+      <div class="scroll-cue">scroll down ↓</div>
+    </section>
+
+    <!-- ===== Quiz ===== -->
+    <section class="quiz-section reveal" id="quiz">
+      <h2>The Birthday Quiz 🧠</h2>
+      <p class="section-sub">A few totally serious questions. Answer honestly. 😇</p>
+      <div class="quiz-card" id="quiz-card">
+        <div class="quiz-progress"><span id="quiz-bar"></span></div>
+        <div class="quiz-host" aria-hidden="true">🤖</div>
+        <div class="quiz-stage" id="quiz-stage" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <!-- ===== Cake ===== -->
+    <section class="cake-section reveal">
+      <h2>Make a wish 🕯️</h2>
+      <p class="section-sub">Close your eyes, make a wish, then tap the candles to blow them out.</p>
+      <div class="cake" id="cake">
+        <div class="knife" id="knife" role="button" tabindex="-1" aria-label="Knife: drag it down through the cake">🔪</div>
+        <div class="cut-line" id="cut-line"></div>
+        <div class="slice" id="slice" aria-hidden="true">🍰</div>
+        <div class="candles" id="candles"></div>
+        <div class="tier tier-top"><span class="drip"></span></div>
+        <div class="tier tier-bottom"><span class="drip"></span><span class="sprinkles"></span></div>
+        <div class="plate"></div>
+      </div>
+      <p class="wish-msg" id="wish-msg">Your wish is on its way ✨💫</p>
+      <p class="cut-hint" id="cut-hint">Your turn! Grab the knife and drag it down through the cake 🔪👇</p>
+      <div class="feed" id="feed">
+        <p class="feed-title">Now feed your friends! Tap a friend to give them a slice 🍰</p>
+        <div class="friends" id="friends"></div>
+        <p class="feed-done" id="feed-done"></p>
+      </div>
+    </section>
+
+    <!-- ===== Gallery ===== -->
+    <section class="gallery-section reveal">
+      <h2>Little moments 📸</h2>
+      <p class="section-sub">A few snapshots of the wonderful you. Tap one to see it bigger.</p>
+      <div class="gallery" id="gallery"></div>
+    </section>
+
+    <!-- ===== Reasons ===== -->
+    <section class="reasons-section reveal">
+      <h2>Things that make you awesome 💛</h2>
+      <p class="section-sub">Tap a card to flip it.</p>
+      <div class="reasons" id="reasons"></div>
+    </section>
+
+    <!-- ===== Message ===== -->
+    <section class="message-section reveal">
+      <h2>A little note for you</h2>
+      <div class="letter">
+        <div class="letter-body" id="letter"></div>
+        <p class="signature" id="signature"></p>
+      </div>
+    </section>
+
+    <footer>
+      <p id="footer-text">Made with lots of 💖</p>
+      <button class="btn small" id="again">🎊 One more time!</button>
+    </footer>
+  </main>
+
+  <!-- Lightbox -->
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <button class="lb-close" id="lb-close" aria-label="Close">✕</button>
+    <button class="lb-nav lb-prev" id="lb-prev" aria-label="Previous photo">‹</button>
+    <img id="lb-img" alt="" />
+    <button class="lb-nav lb-next" id="lb-next" aria-label="Next photo">›</button>
+    <p id="lb-cap"></p>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast" role="status"></div>
+
+  <script src="js/sound.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/buddy.js"></script>
+</body>
+</html>
