@@ -12,7 +12,7 @@ const CONFIG = {
   photos: [
     { src: "photos/black-dress.jpg",    caption: "That smile though ✨" },
     { src: "photos/group.jpg",          caption: "The whole gang 💛" },
-    { src: "photos/lecture-selfie.jpg", caption: "Lecture hall partners in crime 📚" },
+    { src: "photos/lecture-selfie.jpg", caption: "No credit homework 📚" },
     { src: "photos/yellow-flowers.jpg", caption: "Even the flowers are jealous 🌼" },
     { src: "photos/squad.jpg",          caption: "Squad day out 🧸" },
     { src: "photos/tea-time.jpg",       caption: "Tea first, lectures later ☕" },
